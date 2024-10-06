@@ -91,7 +91,7 @@ function typescript() {
 // }
 
 function images() {
-	return src(['app/img/src/*.*', '!app/img/src/*.svg'], { encoding: false })
+	return src(['app/img/src/*.*'], { encoding: false })
 		.pipe(newer('app/img/dist'))
 		.pipe(imagemin({ verbose: true }))
 		.pipe(dest('app/img/dist'));
