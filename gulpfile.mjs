@@ -3,7 +3,10 @@ import { src, dest, series, parallel, watch, task } from 'gulp';
 import * as dartSass from 'sass';
 import gulpSass from 'gulp-sass';
 import gulpMode from 'gulp-mode';
+import coffee from 'gulp-coffee';
 import sourcemaps from 'gulp-sourcemaps';
+import plumber from 'gulp-plumber';
+import notify from 'gulp-notify';
 import noop from 'gulp-noop';
 import concat from 'gulp-concat';
 import rename from 'gulp-rename';
@@ -16,18 +19,30 @@ import fonter from 'gulp-fonter';
 import ttfWoff from 'gulp-ttf2woff2';
 import { deleteAsync } from 'del';
 
-const sass = gulpSass(dartSass);
 const mode = gulpMode({
 	modes: ['production', 'development'],
 	defaultMode: 'development',
 	verbose: false,
 });
 
-const isProduction = mode.production();
+const sass = gulpSass(dartSass);
 const bs = browserSync.create();
+
+const plumberNotify = (title) => {
+	return {
+		errorHandler: notify.onError({
+			title: title,
+			message: 'Error: <%= error.message %>',
+			sound: false,
+		}),
+	};
+};
+
+const isProduction = mode.production();
 
 function styles() {
 	return src('app/scss/*.scss')
+		.pipe(plumber(plumberNotify('SCSS')))
 		.pipe(isProduction ? noop() : sourcemaps.init())
 		.pipe(
 			autoprefixer({
@@ -55,13 +70,24 @@ function styles() {
 		.pipe(bs.stream());
 }
 
-function scripts() {
-	return src('app/scripts/index.js')
-		.pipe(concat('index.min.js'))
+function coffeeScripts() {
+	return src('app/coffee/index.coffee')
+		.pipe(plumber(plumberNotify('COFFEE')))
+		.pipe(coffee({ bare: true }))
 		.pipe(mode.production(uglify()))
+		.pipe(concat('index.min.js'))
 		.pipe(dest('app/scripts'))
 		.pipe(bs.stream());
 }
+
+// function scripts() {
+// 	return src('app/scripts/index.js')
+// 		.pipe(plumber(plumberNotify('JS')))
+// 		.pipe(concat('index.min.js'))
+// 		.pipe(mode.production(uglify()))
+// 		.pipe(dest('app/scripts'))
+// 		.pipe(bs.stream());
+// }
 
 function images() {
 	return src(['app/img/src/*.*', '!app/img/src/*.svg'], { encoding: false })
@@ -113,13 +139,15 @@ function watchFiles() {
 		});
 	}
 	watch(['app/scss/**/*.scss'], styles);
-	watch(['app/scripts/**/*.js', '!app/scripts/index.min.js'], scripts);
+	watch(['app/coffee/**/*.coffee'], coffeeScripts);
+	// watch(['app/scripts/**/*.js', '!app/scripts/index.min.js'], scripts);
 	watch(['app/img/src/'], images);
 	watch(['app/*.html']).on('change', bs.reload);
 }
 
 task('styles', styles);
-task('scripts', scripts);
+// task('scripts', scripts);
+task('coffee', coffeeScripts);
 task('clean', cleanDist);
 task('images', images);
 task('fonts', fonts);
@@ -129,8 +157,8 @@ task('production', build);
 
 async function allTasks() {
 	return isProduction
-		? series('styles', 'scripts', 'production')()
-		: parallel('html', 'styles', 'images', 'fonts', 'scripts', 'watch')();
+		? series('styles', 'coffee', 'production')()
+		: parallel('html', 'styles', 'images', 'fonts', 'coffee', 'watch')();
 }
 
 // gulp build --production для сборки на production
