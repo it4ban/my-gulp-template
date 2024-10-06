@@ -3,7 +3,6 @@ import { src, dest, series, parallel, watch, task } from 'gulp';
 import * as dartSass from 'sass';
 import gulpSass from 'gulp-sass';
 import gulpMode from 'gulp-mode';
-import coffee from 'gulp-coffee';
 import sourcemaps from 'gulp-sourcemaps';
 import plumber from 'gulp-plumber';
 import notify from 'gulp-notify';
@@ -17,6 +16,7 @@ import newer from 'gulp-newer';
 import imagemin from 'gulp-imagemin';
 import fonter from 'gulp-fonter';
 import ttfWoff from 'gulp-ttf2woff2';
+import ts from 'gulp-typescript';
 import { deleteAsync } from 'del';
 
 const mode = gulpMode({
@@ -27,6 +27,7 @@ const mode = gulpMode({
 
 const sass = gulpSass(dartSass);
 const bs = browserSync.create();
+const tsProject = ts.createProject('tsconfig.json', { noImplicitAny: true });
 
 const plumberNotify = (title) => {
 	return {
@@ -70,10 +71,10 @@ function styles() {
 		.pipe(bs.stream());
 }
 
-function coffeeScripts() {
-	return src('app/coffee/index.coffee')
-		.pipe(plumber(plumberNotify('COFFEE')))
-		.pipe(coffee({ bare: true }))
+function typescript() {
+	return src('app/ts/*.ts')
+		.pipe(plumber(plumberNotify('TS')))
+		.pipe(tsProject())
 		.pipe(mode.production(uglify()))
 		.pipe(concat('index.min.js'))
 		.pipe(dest('app/scripts'))
@@ -139,7 +140,7 @@ function watchFiles() {
 		});
 	}
 	watch(['app/scss/**/*.scss'], styles);
-	watch(['app/coffee/**/*.coffee'], coffeeScripts);
+	watch(['app/ts/**/*.ts'], typescript);
 	// watch(['app/scripts/**/*.js', '!app/scripts/index.min.js'], scripts);
 	watch(['app/img/src/'], images);
 	watch(['app/*.html']).on('change', bs.reload);
@@ -147,7 +148,7 @@ function watchFiles() {
 
 task('styles', styles);
 // task('scripts', scripts);
-task('coffee', coffeeScripts);
+task('ts', typescript);
 task('clean', cleanDist);
 task('images', images);
 task('fonts', fonts);
@@ -157,8 +158,8 @@ task('production', build);
 
 async function allTasks() {
 	return isProduction
-		? series('styles', 'coffee', 'production')()
-		: parallel('html', 'styles', 'images', 'fonts', 'coffee', 'watch')();
+		? series('styles', 'ts', 'production')()
+		: parallel('html', 'styles', 'images', 'fonts', 'ts', 'watch')();
 }
 
 // gulp build --production для production сборке
