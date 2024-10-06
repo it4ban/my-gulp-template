@@ -161,8 +161,8 @@ async function allTasks() {
 		: parallel('html', 'styles', 'images', 'fonts', 'coffee', 'watch')();
 }
 
-// gulp build --production для сборки на production
+// gulp build --production для production сборке
 task('build', series(cleanDist, allTasks));
 
-// gulp для сборки на develop
+// gulp для develop сборке
 task('default', allTasks);
