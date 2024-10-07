@@ -17,7 +17,13 @@ import imagemin from 'gulp-imagemin';
 import fonter from 'gulp-fonter';
 import ttfWoff from 'gulp-ttf2woff2';
 import ts from 'gulp-typescript';
+import fileinclude from 'gulp-file-include';
 import { deleteAsync } from 'del';
+
+const fileIncludeSettings = {
+	prefix: '@@',
+	basepath: '@file',
+};
 
 const mode = gulpMode({
 	modes: ['production', 'development'],
@@ -108,7 +114,11 @@ async function fonts() {
 }
 
 function html() {
-	return src('app/*.html').pipe(dest('app')).pipe(bs.stream());
+	return src('app/*.html')
+		.pipe(plumber(plumberNotify('HTML')))
+		.pipe(fileinclude(fileIncludeSettings))
+		.pipe(dest('app'))
+		.pipe(bs.stream());
 }
 
 async function cleanDist() {
