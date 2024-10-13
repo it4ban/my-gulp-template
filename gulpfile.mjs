@@ -9,16 +9,19 @@ import notify from 'gulp-notify';
 import noop from 'gulp-noop';
 import concat from 'gulp-concat';
 import rename from 'gulp-rename';
-import autoprefixer from 'gulp-autoprefixer';
+import postcss from 'gulp-postcss';
+import autoprefixer from 'autoprefixer';
 import uglify from 'gulp-uglify';
 import browserSync from 'browser-sync';
 import newer from 'gulp-newer';
 import imagemin from 'gulp-imagemin';
 import fonter from 'gulp-fonter';
 import ttfWoff from 'gulp-ttf2woff2';
-import ts from 'gulp-typescript';
 import fileinclude from 'gulp-file-include';
 import { deleteAsync } from 'del';
+import webpack from 'webpack';
+import webpackStream from 'webpack-stream';
+import webpackConfig from './webpack.config.js';
 
 const fileIncludeSettings = {
 	prefix: '@@',
@@ -33,7 +36,6 @@ const mode = gulpMode({
 
 const sass = gulpSass(dartSass);
 const bs = browserSync.create();
-const tsProject = ts.createProject('tsconfig.json', { noImplicitAny: true });
 
 const plumberNotify = (title) => {
 	return {
@@ -51,26 +53,27 @@ function styles() {
 	return src('app/scss/*.scss')
 		.pipe(plumber(plumberNotify('SCSS')))
 		.pipe(isProduction ? noop() : sourcemaps.init())
+		.pipe(sass({ outputStyle: isProduction ? 'compressed' : 'expanded' }).on('error', sass.logError))
 		.pipe(
-			autoprefixer({
-				overrideBrowserslist: [
-					'> 1%',
-					'ie >= 8',
-					'edge >= 15',
-					'ie_mob >= 10',
-					'ff >= 45',
-					'chrome >= 45',
-					'safari >= 7',
-					'opera >= 23',
-					'ios >= 7',
-					'android >= 4',
-					'bb >= 10',
-				],
-				grid: true,
-			}),
+			postcss([
+				autoprefixer({
+					overrideBrowserslist: [
+						'> 1%',
+						'ie >= 8',
+						'edge >= 15',
+						'ie_mob >= 10',
+						'ff >= 45',
+						'chrome >= 45',
+						'safari >= 7',
+						'opera >= 23',
+						'ios >= 7',
+						'android >= 4',
+						'bb >= 10',
+					],
+					grid: true,
+				}),
+			]),
 		)
-		.pipe(sass().on('error', sass.logError))
-		.pipe(sass({ outputStyle: isProduction ? 'compressed' : 'expanded' }))
 		.pipe(isProduction ? noop() : sourcemaps.write(''))
 		.pipe(rename({ suffix: '.min' }))
 		.pipe(dest('app/css'))
@@ -80,7 +83,7 @@ function styles() {
 function typescript() {
 	return src('app/ts/*.ts')
 		.pipe(plumber(plumberNotify('TS')))
-		.pipe(tsProject())
+		.pipe(webpackStream(webpackConfig, webpack))
 		.pipe(mode.production(uglify()))
 		.pipe(concat('index.min.js'))
 		.pipe(dest('app/scripts'))
@@ -114,7 +117,7 @@ async function fonts() {
 }
 
 function html() {
-	return src('app/*.html')
+	return src(['app/*.html'])
 		.pipe(plumber(plumberNotify('HTML')))
 		.pipe(fileinclude(fileIncludeSettings))
 		.pipe(dest('app'))
@@ -153,7 +156,7 @@ function watchFiles() {
 	watch(['app/ts/**/*.ts'], typescript);
 	// watch(['app/scripts/**/*.js', '!app/scripts/index.min.js'], scripts);
 	watch(['app/img/src/'], images);
-	watch(['app/*.html']).on('change', bs.reload);
+	watch(['app/*.html', 'app/partials/**/*.html']).on('change', series('html', bs.reload));
 }
 
 task('styles', styles);
